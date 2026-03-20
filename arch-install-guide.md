@@ -1,9 +1,5 @@
 # Arch Linux: Modern Secure Boot Stack
 
-> dracut · kernel-install · UKI · LUKS2 · Btrfs
-
-**Tags:** `UEFI only` · `LUKS2` · `Btrfs` · `dracut` · `UKI` · `systemd-boot`
-
 ---
 
 ## Table of Contents
@@ -32,7 +28,7 @@
 
 ---
 
-## 00. Overview & Goals
+## Overview & Goals
 
 This guide replaces the default mkinitcpio stack with dracut + kernel-install, producing Unified Kernel Images (UKI) that live on the ESP. The root filesystem is LUKS2-encrypted Btrfs with subvolumes.
 
@@ -77,7 +73,7 @@ Boot the Arch ISO and prepare the live environment before touching the disk.
 The Arch ISO defaults to `us`. Load the Italian layout for the live session so passwords and paths are typed correctly from the start.
 
 ```bash
-# loadkeys it
+loadkeys it
 ```
 
 > [!WARNING]
@@ -89,7 +85,7 @@ The Arch ISO defaults to `us`. Load the Italian layout for the live session so p
 ### Step 2: Verify UEFI boot mode
 
 ```bash
-# cat /sys/firmware/efi/fw_platform_size
+cat /sys/firmware/efi/fw_platform_size
 # Must output 64 (or 32 for 32-bit UEFI)
 ```
 
@@ -98,21 +94,21 @@ The Arch ISO defaults to `us`. Load the Italian layout for the live session so p
 Wired: usually works automatically. Wireless:
 
 ```bash
-# iwctl
+iwctl
 # [iwd] device list
 # [iwd] station wlan0 scan
 # [iwd] station wlan0 get-networks
 # [iwd] station wlan0 connect "SSID"
 # [iwd] quit
 
-# ping -c3 archlinux.org
+ping -c3 archlinux.org
 ```
 
 ### Step 4: Sync clock & update mirrors
 
 ```bash
-# timedatectl set-ntp true
-# reflector --country "Germany,France" --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
+timedatectl set-ntp true
+reflector --country "Germany,France" --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
 ```
 
 > [!TIP]
@@ -127,7 +123,7 @@ Create two partitions: an EFI System Partition and a LUKS container. Adjust /dev
 ### Step 1: Identify your disk
 
 ```bash
-# lsblk -o NAME,SIZE,TYPE,MODEL
+lsblk -o NAME,SIZE,TYPE,MODEL
 ```
 
 ### Step 2: Wipe & create GPT table with fdisk
@@ -136,13 +132,13 @@ Create two partitions: an EFI System Partition and a LUKS container. Adjust /dev
 > **This destroys all data on the disk.** Double-check the device name before proceeding.
 
 ```bash
-# fdisk /dev/nvme0n1
+fdisk /dev/nvme0n1
 
 # Inside fdisk:
 #  g          → new GPT partition table
 #  n          → new partition (p1, default start, +1G) → EFI
 #  t → 1      → type: EFI System (1)
-#  n          → new partition (p2, default start, default end) → LUKS
+#  n          → new partition (p2, default start, default end) → Linux root
 #  t → 23       → type: Linux root x86-64 (23)
 #  w          → write and quit
 ```
@@ -153,7 +149,7 @@ Create two partitions: an EFI System Partition and a LUKS container. Adjust /dev
 ### Step 3: Format the ESP
 
 ```bash
-# mkfs.fat -F32 -n EFI /dev/nvme0n1p1
+mkfs.fat -F32 -n EFI /dev/nvme0n1p1
 ```
 
 ---
@@ -165,7 +161,7 @@ Encrypt the root partition with LUKS2 using Argon2id key derivation — signific
 ### Step 1: Create the LUKS2 container
 
 ```bash
-# cryptsetup luksFormat \
+cryptsetup luksFormat \
 --type luks2 \
 --cipher aes-xts-plain64 \
 --key-size 512 \
@@ -182,7 +178,7 @@ Encrypt the root partition with LUKS2 using Argon2id key derivation — signific
 ### Step 2: Open the container
 
 ```bash
-# cryptsetup open /dev/nvme0n1p2 cryptroot
+cryptsetup open /dev/nvme0n1p2 cryptroot
 # → /dev/mapper/cryptroot is now available
 ```
 
@@ -195,21 +191,21 @@ Format the LUKS container as Btrfs and create a logical subvolume layout that en
 ### Step 1: Create the Btrfs filesystem
 
 ```bash
-# mkfs.btrfs -L ARCH /dev/mapper/cryptroot
+mkfs.btrfs -L ARCH /dev/mapper/cryptroot
 ```
 
 ### Step 2: Mount the top-level and create subvolumes
 
 ```bash
-# mount /dev/mapper/cryptroot /mnt
+mount /dev/mapper/cryptroot /mnt
 
-# btrfs subvolume create /mnt/@
-# btrfs subvolume create /mnt/@home
-# btrfs subvolume create /mnt/@snapshots
-# btrfs subvolume create /mnt/@var_log
-# btrfs subvolume create /mnt/@var_cache
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@var_log
+btrfs subvolume create /mnt/@var_cache
 
-# umount /mnt
+umount /mnt
 ```
 
 > [!TIP]
@@ -227,20 +223,20 @@ Mount all subvolumes and the ESP with the correct options before running pacstra
 # Common btrfs options
 OPTS = "noatime,compress=zstd:1,space_cache=v2"
 
-# mount -o ${OPTS},subvol=@ /dev/mapper/cryptroot /mnt
+mount -o ${OPTS},subvol=@ /dev/mapper/cryptroot /mnt
 
-# mkdir -p /mnt/{efi,home,.snapshots,var/log,var/cache/pacman/pkg}
+mkdir -p /mnt/{efi,home,.snapshots,var/log,var/cache/pacman/pkg}
 
-# mount -o ${OPTS},subvol=@home /dev/mapper/cryptroot /mnt/home
-# mount -o ${OPTS},subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
-# mount -o ${OPTS},subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
-# mount -o ${OPTS},subvol=@var_cache /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
+mount -o ${OPTS},subvol=@home /dev/mapper/cryptroot /mnt/home
+mount -o ${OPTS},subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
+mount -o ${OPTS},subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
+mount -o ${OPTS},subvol=@var_cache /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
 ```
 
 ### Step 2: Mount the ESP at /efi
 
 ```bash
-# mount --mkdir /dev/nvme0n1p1 /mnt/efi
+mount --mkdir /dev/nvme0n1p1 /mnt/efi
 ```
 
 > [!NOTE]
@@ -255,7 +251,7 @@ Install the base system. Note: we do not install mkinitcpio. We'll install dracu
 ### Step 1: Install base packages
 
 ```bash
-# pacstrap -K /mnt \
+pacstrap -K /mnt \
 base \
 linux \
 linux-headers \
@@ -288,8 +284,8 @@ Generate the filesystem table and enter the new system.
 ### Step 1: Generate fstab
 
 ```bash
-# genfstab -U /mnt >> /mnt/etc/fstab
-# cat /mnt/etc/fstab # verify it looks correct
+genfstab -U /mnt >> /mnt/etc/fstab
+cat /mnt/etc/fstab # verify it looks correct
 ```
 
 > [!TIP]
@@ -298,7 +294,7 @@ Generate the filesystem table and enter the new system.
 ### Step 2: Enter the chroot
 
 ```bash
-# arch-chroot /mnt
+arch-chroot /mnt
 ```
 
 ---
@@ -310,13 +306,13 @@ Configure locale, timezone, hostname, and user accounts inside the chroot.
 ### Step 1: Timezone & locale
 
 ```bash
-# ln -sf /usr/share/zoneinfo/Europe/Rome /etc/localtime
-# hwclock --systohc
+ln -sf /usr/share/zoneinfo/Europe/Rome /etc/localtime
+hwclock --systohc
 
-# Uncomment your locale(s) in /etc/locale.gen, e.g. en_US.UTF-8
-# sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
-# locale-gen
-# echo "LANG=en_US.UTF-8" > /etc/locale.conf
+# Uncomment your locale(s) in /etc/locale.gen, e.g. it_IT.UTF-8
+sed -i 's/#it_IT.UTF-8/it_IT.UTF-8/' /etc/locale.gen
+locale-gen
+echo "LANG=it_IT.UTF-8" > /etc/locale.conf
 ```
 
 ### Step 2: Console keymap (persistent)
@@ -325,10 +321,10 @@ Use `localectl` to set the console keymap and X11 keymap independently. The `--n
 
 ```bash
 # Set console (TTY) keymap — writes KEYMAP= to /etc/vconsole.conf
-# localectl set-keymap --no-convert it
+localectl set-keymap --no-convert it
 
 # Set X11 keymap — writes to /etc/X11/xorg.conf.d/00-keyboard.conf
-# localectl set-x11-keymap --no-convert it
+localectl set-x11-keymap --no-convert it
 ```
 
 > [!TIP]
@@ -343,7 +339,7 @@ Use `localectl` to set the console keymap and X11 keymap independently. The `--n
 ### Step 3: Hostname & hosts
 
 ```bash
-# echo "mymachine" > /etc/hostname
+echo "mymachine" > /etc/hostname
 ```
 
 /etc/hosts
@@ -355,13 +351,13 @@ Use `localectl` to set the console keymap and X11 keymap independently. The `--n
 ### Step 4: Root password & user
 
 ```bash
-# passwd
+passwd
 
-# useradd -mG wheel,audio,video antonio
-# passwd antonio
+useradd -mG wheel,audio,video myuser
+passwd myuser
 
 # Enable sudo for wheel group:
-# EDITOR=vim visudo # uncomment: %wheel ALL=(ALL:ALL) ALL
+EDITOR=vim visudo # uncomment: %wheel ALL=(ALL:ALL) ALL
 ```
 
 ### Step 5: Get the LUKS partition UUID
@@ -369,7 +365,7 @@ Use `localectl` to set the console keymap and X11 keymap independently. The `--n
 You'll need this for the kernel command line in the next steps:
 
 ```bash
-# blkid -s UUID -o value /dev/nvme0n1p2
+blkid -s UUID -o value /dev/nvme0n1p2
 # You'll need this for /etc/kernel/cmdline in section 10
 ```
 
@@ -381,8 +377,11 @@ When kernel-install drives the build, dracut acts as a subordinate tool — it b
 
 ### Step 1: Main dracut configuration
 
-/etc/dracut.conf.d/10-main.conf
+```bash
+vim /etc/dracut.conf.d/10-main.conf
+```
 
+```
 # Modules: systemd init, LUKS (crypt) + systemd-cryptsetup (dracut ≥102)
 add_dracutmodules+=" systemd crypt "
  
@@ -391,24 +390,33 @@ compress="zstd"
  
 # Embed CPU microcode as early CPIO (intel-ucode / amd-ucode)
 early_microcode="yes"
+```
 
 > [!NOTE]
 > No `uefi=`, `uefi_stub=`, `uefi_dir=`, `kernel_cmdline=`, or `uefi_splash=` here. Those are now owned by ukify via `/etc/kernel/uki.conf` and `/etc/kernel/cmdline`. dracut.conf is purely about initramfs construction.
 
 ### Step 2: Btrfs module
 
-/etc/dracut.conf.d/20-btrfs.conf
+```bash
+vim /etc/dracut.conf.d/20-btrfs.conf
+```
 
+```
 add_dracutmodules+=" btrfs "
 filesystems+=" btrfs "
+```
 
 ### Step 3: Host-only mode
 
-/etc/dracut.conf.d/30-host.conf
+```bash
+vim /etc/dracut.conf.d/30-host.conf
+```
 
+```
 # Only include modules needed for this hardware — smaller, faster UKI
 hostonly="yes"
 hostonly_cmdline="no"
+```
 
 > [!TIP]
 > `hostonly=yes` produces a lean UKI by only including what your current hardware needs. The resulting image won't boot on a different machine without rebuilding — that's fine for a personal install.
@@ -418,8 +426,8 @@ hostonly_cmdline="no"
 dracut ships two pacman hooks that call dracut directly on kernel install/remove, bypassing kernel-install entirely. Mask them with null symlinks so they fire but do nothing:
 
 ```bash
-# ln -s /dev/null /etc/pacman.d/hooks/90-dracut-install.hook
-# ln -s /dev/null /etc/pacman.d/hooks/60-dracut-remove.hook
+ln -s /dev/null /etc/pacman.d/hooks/90-dracut-install.hook
+ln -s /dev/null /etc/pacman.d/hooks/60-dracut-remove.hook
 ```
 
 > [!NOTE]
@@ -433,9 +441,13 @@ kernel-install orchestrates the whole build: it reads config, invokes dracut via
 
 ### Step 1: Configure kernel-install
 
-/etc/kernel/install.conf
+```bash
+vim /etc/kernel/install.conf
+```
 
+```
 layout=uki
+```
 
 > [!NOTE]
 > `layout=uki` is the only key needed here. kernel-install will use ukify (via `systemd-ukify`) to assemble the final UKI, with dracut generating the initramfs as part of that process.
@@ -444,9 +456,13 @@ layout=uki
 
 kernel-install reads the cmdline from `/etc/kernel/cmdline` and passes it to ukify, which embeds it into the UKI.
 
-/etc/kernel/cmdline
+```bash
+vim /etc/kernel/cmdline
+```
 
+```
 rd.luks.uuid=<YOUR-LUKS-UUID> rd.luks.name=<YOUR-LUKS-UUID>=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ splash quiet rw
+```
 
 > [!WARNING]
 > Replace both instances of `<YOUR-LUKS-UUID>` with the UUID from `blkid -s UUID -o value /dev/nvme0n1p2`. Single line, no trailing newline.
@@ -458,10 +474,14 @@ rd.luks.uuid=<YOUR-LUKS-UUID> rd.luks.name=<YOUR-LUKS-UUID>=cryptroot root=/dev/
 
 ukify reads `/etc/kernel/uki.conf` for UKI-specific settings like the splash screen and EFI stub path. These are no longer set in dracut.conf.
 
-/etc/kernel/uki.conf
+```bash
+vim /etc/kernel/uki.conf
+```
 
+```
 [UKI]
 Splash=/usr/share/systemd/bootctl/splash-arch.bmp
+```
 
 > [!TIP]
 > The splash image is displayed by the firmware as soon as the UKI is executed, before the kernel starts. The BMP ships with the `systemd` package — no extra install needed.
@@ -472,8 +492,11 @@ See section 09 step 4 for masking dracut's hooks. Now create the hooks that trig
 
 Helper script called by both hooks:
 
-/usr/local/bin/kernel-install-hook
+```bash
+vim /usr/local/bin/kernel-install-hook
+```
 
+```
 #!/usr/bin/env bash
 set -euo pipefail
 shopt -s inherit_errexit nullglob
@@ -511,15 +534,19 @@ for kver in "${!versions[@]}"; do
     kimage="/usr/lib/modules/$kver/vmlinuz"
     kernel-install "$@" "$kver" "$kimage" || true
 done
+```
 
 ```bash
-# chmod 755 /usr/local/bin/kernel-install-hook
+chmod 755 /usr/local/bin/kernel-install-hook
 ```
 
 The add hook:
 
-/etc/pacman.d/hooks/90-kernel-install-add.hook
+```bash
+vim /etc/pacman.d/hooks/90-kernel-install-add.hook
+```
 
+```
 [Trigger]
 Type = Path
 Operation = Install
@@ -546,11 +573,15 @@ Description = Installing kernel and initrd using kernel-install...
 When = PostTransaction
 Exec = /usr/local/bin/kernel-install-hook add
 NeedsTargets
+```
 
 The remove hook:
 
-/etc/pacman.d/hooks/40-kernel-install-remove.hook
+```bash
+vim /etc/pacman.d/hooks/40-kernel-install-remove.hook
+```
 
+```
 [Trigger]
 Type = Path
 Operation = Upgrade
@@ -577,6 +608,7 @@ Description = Removing kernel and initrd using kernel-install...
 When = PostTransaction
 Exec = /usr/local/bin/kernel-install-hook remove
 NeedsTargets
+```
 
 > [!TIP]
 > The second `[Trigger]` block fires when dracut itself updates, or when firmware/ucode/DKMS modules change — not just when the kernel vmlinuz changes. The script's `all_kernels` flag handles these cases by rebuilding UKIs for every currently installed kernel.
@@ -586,12 +618,12 @@ NeedsTargets
 ```bash
 # Get the installed kernel version
 KVER =$( ls /usr/lib/modules)
-# echo $KVER # e.g. 6.x.y-arch1-1
+echo $KVER # e.g. 6.x.y-arch1-1
 
-# kernel-install -v add ${KVER} /usr/lib/modules/${KVER}/vmlinuz
+kernel-install -v add ${KVER} /usr/lib/modules/${KVER}/vmlinuz
 
 # Verify the UKI was created on the ESP
-# find /efi -name "*.efi"
+find /efi -name "*.efi"
 ```
 
 > [!TIP]
@@ -609,19 +641,23 @@ systemd-boot is a minimal EFI boot manager that auto-discovers UKIs from /efi/EF
 ### Step 1: Install bootloader to ESP
 
 ```bash
-# bootctl --esp-path=/efi install
+bootctl --esp-path=/efi install
 ```
 
 This installs systemd-boot to `/efi/EFI/systemd/` and creates an NVRAM boot entry.
 
 ### Step 2: Loader configuration (optional but recommended)
 
-/efi/loader/loader.conf
+```bash
+vim /efi/loader/loader.conf
+```
 
-default  @saved
-timeout  3
-console-mode  auto
-editor   no
+```
+default      @saved
+timeout      3
+console-mode max
+editor       no
+```
 
 > [!TIP]
 > `editor no` prevents anyone from modifying the kernel cmdline at boot — since it's baked into the UKI anyway, this is purely defensive. `@saved` boots the last manually selected entry.
@@ -632,7 +668,7 @@ editor   no
 ### Step 3: Enable automatic bootloader updates
 
 ```bash
-# systemctl enable systemd-boot-update.service
+systemctl enable systemd-boot-update.service
 ```
 
 This service updates the bootloader binaries on the ESP whenever systemd-boot itself is updated via pacman.
@@ -646,57 +682,47 @@ Last checks before leaving the chroot and rebooting into your new system.
 ### Step 1: Enable essential services
 
 ```bash
-# systemctl enable NetworkManager
-# systemctl enable systemd-resolved
+systemctl enable NetworkManager
+systemctl enable systemd-resolved
 ```
 
 ### Step 2: Final verification checklist
 
 ```bash
 # 1. UKI exists on ESP
-# ls /efi/EFI/Linux/
+ls /efi/EFI/Linux/
 
 # 2. systemd-boot is installed
-# bootctl status
+bootctl status
 
 # 3. fstab looks correct
-# cat /etc/fstab
+cat /etc/fstab
 
 # 4. LUKS UUID in /etc/kernel/cmdline matches blkid
-# cat /etc/kernel/cmdline
-# blkid -s UUID -o value /dev/nvme0n1p2
+cat /etc/kernel/cmdline
+blkid -s UUID -o value /dev/nvme0n1p2
 ```
 
 ### Step 3: Exit, unmount, reboot
 
 ```bash
-# exit # leave chroot
-# umount -R /mnt
-# cryptsetup close cryptroot
-# reboot
+exit # leave chroot
+umount -R /mnt
+cryptsetup close cryptroot
+reboot
 ```
 
 > [!TIP]
 > On first boot you'll be prompted for your LUKS passphrase by the systemd cryptsetup agent inside the initramfs. After unlocking, the Btrfs root mounts automatically and the system boots.
 
-### Further recommendations
-
-**Snapper** — install `snapper` and configure it for the `@` and `@home` subvolumes for automatic Btrfs snapshots.
-
-**TPM2 unlock** — enroll your LUKS key into the TPM2 chip with `systemd-cryptenroll --tpm2-device=auto /dev/nvme0n1p2` so you don't need to type the passphrase on trusted boots.
-
-**Secure Boot** — use `sbctl` to create your own Secure Boot keys and sign the UKI. dracut's UKI format is designed exactly for this workflow.
-
----
-
 ## 13. Package Cache & Mirror Management
 
-Keep the package cache lean with paccache and the mirror list fast with reflector . Both integrate with systemd timers for zero-maintenance operation.
+Keep the package cache lean with paccache and the mirror list fast with reflector. Both integrate with systemd timers for zero-maintenance operation.
 
 ### Step 1: Install pacman-contrib & reflector
 
 ```bash
-$ sudo pacman -S pacman-contrib reflector
+sudo pacman -S pacman-contrib reflector
 ```
 
 ### Step 2: paccache — automatic cache cleanup
@@ -704,7 +730,7 @@ $ sudo pacman -S pacman-contrib reflector
 `paccache` removes old cached package versions, keeping the last N for potential rollback. The included systemd timer runs it weekly.
 
 ```bash
-$ sudo systemctl enable --now paccache.timer
+sudo systemctl enable --now paccache.timer
 ```
 
 > [!NOTE]
@@ -717,21 +743,24 @@ Useful manual invocations:
 
 ```bash
 # Dry-run: see what would be removed
-$ paccache -d
+paccache -d
 
 # Remove old versions (keep 3)
-$ sudo paccache -r
+sudo paccache -r
 
 # Remove ALL cached versions of uninstalled packages
-$ sudo paccache -ruk0
+sudo paccache -ruk0
 ```
 
 ### Step 3: reflector — automatic mirror ranking
 
 `reflector` fetches the Arch mirror list, filters by country/protocol/age, sorts by speed, and writes the result to `/etc/pacman.d/mirrorlist`. Configure it once in its config file:
 
-/etc/xdg/reflector/reflector.conf
+```bash
+vim /etc/xdg/reflector/reflector.conf
+```
 
+```
 # Save to the standard mirrorlist path
 --save /etc/pacman.d/mirrorlist
  
@@ -749,9 +778,10 @@ $ sudo paccache -ruk0
 --latest 20
 --number 10
 --connection-timeout 5
+```
 
 ```bash
-$ sudo systemctl enable --now reflector.timer
+sudo systemctl enable --now reflector.timer
 ```
 
 > [!WARNING]
@@ -760,8 +790,8 @@ $ sudo systemctl enable --now reflector.timer
 Run on demand:
 
 ```bash
-$ sudo systemctl start reflector.service
-$ journalctl -fu reflector.service
+sudo systemctl start reflector.service
+journalctl -fu reflector.service
 ```
 
 ### Step 4: pacman hook — refresh mirrors when pacman-mirrorlist updates
@@ -769,11 +799,10 @@ $ journalctl -fu reflector.service
 The `pacman-mirrorlist` package occasionally ships a new default mirrorlist that overwrites yours. This hook re-runs reflector after any such upgrade:
 
 ```bash
-$ sudo mkdir -p /etc/pacman.d/hooks
+vim /etc/pacman.d/hooks/mirrorlist.hook
 ```
 
-/etc/pacman.d/hooks/mirrorlist.hook
-
+```
 [Trigger]
 Operation = Upgrade
 Type = Package
@@ -783,5 +812,14 @@ Description = Updating mirrorlist with reflector...
 When = PostTransaction
 Depends = reflector
 Exec = /usr/bin/reflector --config /etc/xdg/reflector/reflector.conf
+```
 
 ---
+
+### Further recommendations
+
+**Snapper** — install `snapper` and configure it for the `@` and `@home` subvolumes for automatic Btrfs snapshots.
+
+**TPM2 unlock** — enroll your LUKS key into the TPM2 chip with `systemd-cryptenroll --tpm2-device=auto /dev/nvme0n1p2` so you don't need to type the passphrase on trusted boots.
+
+**Secure Boot** — use `sbctl` to create your own Secure Boot keys and sign the UKI. dracut's UKI format is designed exactly for this workflow.

@@ -2,8 +2,11 @@
 
 # KDE plasma
 pacman -Sgq plasma | grep -vE 'discover|sddm-kcm' | sudo pacman -S --needed -
-sudo pacman -S --needed ark firefox kate konsole
+sudo pacman -S --needed ark firefox kate konsole tuned tuned-ppd
+
 sudo systemctl enable plasmalogin.service
+sudo systemctl enable --now bluetooth
+sudo systemctl enable --now tuned
 
 # kitty & co
 #sudo pacman -S --needed kitty micro starship zsh fzf zoxide stow
