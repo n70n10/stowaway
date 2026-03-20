@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arch Linux Install Guide — dracut + UKI + LUKS2 + Btrfs</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111318;
+    --surface2: #181c23;
+    --border: #1f2530;
+    --accent: #4fc3f7;
+    --accent2: #81d4fa;
+    --warn: #ffb74d;
+    --danger: #ef5350;
+    --success: #66bb6a;
+    --muted: #546e7a;
+    --text: #cfd8dc;
+    --text-dim: #78909c;
+    --code-bg: #0d1117;
+    --prompt: #4fc3f7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* Layout */
+  .layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .sidebar-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .sidebar-logo .title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .sidebar-logo .subtitle {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .nav-section {
+    padding: 0 12px;
+    margin-bottom: 4px;
+  }
+
+  .nav-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 8px 4px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 12.5px;
+    transition: all 0.15s;
+    text-decoration: none;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(79,195,247,0.1); color: var(--accent); }
+
+  .nav-item .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    min-width: 18px;
+  }
+
+  .nav-item.active .num { color: var(--accent); }
+
+  /* Main content */
+  .main {
+    flex: 1;
+    padding: 40px 48px;
+    max-width: 900px;
+  }
+
+  .page-header {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    color: #ecf0f1;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .page-header .tagline {
+    margin-top: 8px;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .tag-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  .tag {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .tag-blue  { background: rgba(79,195,247,0.12); color: #4fc3f7; border: 1px solid rgba(79,195,247,0.25); }
+  .tag-green { background: rgba(102,187,106,0.12); color: #66bb6a; border: 1px solid rgba(102,187,106,0.25); }
+  .tag-warn  { background: rgba(255,183,77,0.12); color: #ffb74d; border: 1px solid rgba(255,183,77,0.25); }
+  .tag-red   { background: rgba(239,83,80,0.12); color: #ef5350; border: 1px solid rgba(239,83,80,0.25); }
+
+  /* Sections */
+  .section {
+    display: none;
+  }
+  .section.active {
+    display: block;
+  }
+
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ecf0f1;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .section-desc {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  /* Steps */
+  .step {
+    margin-bottom: 28px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(79,195,247,0.12);
+    border: 1px solid rgba(79,195,247,0.3);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+  }
+
+  .step-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #ecf0f1;
+  }
+
+  .step-body {
+    padding: 16px 18px;
+    background: var(--surface2);
+  }
+
+  .step-body p {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    line-height: 1.6;
+  }
+
+  .step-body p:last-child { margin-bottom: 0; }
+
+  /* Code blocks */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 12px 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .code-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .copy-btn {
+    font-size: 10px;
+    color: var(--text-dim);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  .copy-btn:hover { background: var(--border); color: var(--text); }
+  .copy-btn.copied { color: var(--success); }
+
+  .code-content {
+    padding: 14px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.75;
+  }
+
+  .code-content .line { display: block; }
+  .code-content .comment { color: #546e7a; }
+  .code-content .prompt { color: var(--prompt); user-select: none; }
+  .code-content .cmd { color: #e0e0e0; }
+  .code-content .arg { color: #81d4fa; }
+  .code-content .str { color: #a5d6a7; }
+  .code-content .kw { color: #ce93d8; }
+  .code-content .flag { color: #ffcc02; }
+  .code-content .path { color: #f48fb1; }
+  .code-content .num { color: #ffb74d; }
+
+  /* Callouts */
+  .callout {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 12px 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  .callout-icon { flex-shrink: 0; font-size: 15px; }
+
+  .callout-warn { background: rgba(255,183,77,0.08); border: 1px solid rgba(255,183,77,0.2); color: #ffe082; }
+  .callout-info { background: rgba(79,195,247,0.08); border: 1px solid rgba(79,195,247,0.2); color: #b3e5fc; }
+  .callout-danger { background: rgba(239,83,80,0.08); border: 1px solid rgba(239,83,80,0.2); color: #ffcdd2; }
+  .callout-tip { background: rgba(102,187,106,0.08); border: 1px solid rgba(102,187,106,0.2); color: #c8e6c9; }
+
+  /* Inline code */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #90caf9;
+  }
+
+  /* File content blocks */
+  .file-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+
+  .file-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .file-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffb74d;
+  }
+
+  .file-name { color: #f48fb1; font-weight: 500; }
+
+  .file-content {
+    padding: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.75;
+    overflow-x: auto;
+    white-space: pre-wrap;
+  }
+
+  .file-content .fc { color: #e0e0e0; }
+  .file-content .fk { color: #ce93d8; }
+  .file-content .fv { color: #a5d6a7; }
+  .file-content .fc2 { color: #546e7a; }
+  .file-content .fp { color: #f48fb1; }
+
+  /* Nav buttons */
+  .nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn {
+    padding: 9px 18px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-primary {
+    background: rgba(79,195,247,0.15);
+    border: 1px solid rgba(79,195,247,0.35);
+    color: var(--accent);
+  }
+  .btn-primary:hover { background: rgba(79,195,247,0.25); }
+
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Progress */
+  .progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--border);
+    z-index: 100;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4fc3f7, #81d4fa);
+    transition: width 0.3s ease;
+  }
+
+  /* Schema diagram */
+  .schema {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 12px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 2;
+  }
+
+  .schema .disk { color: #90caf9; }
+  .schema .part { color: #a5d6a7; }
+  .schema .mount { color: #f48fb1; }
+  .schema .fs { color: #ffb74d; }
+  .schema .indent { display: block; padding-left: 24px; }
+  .schema .indent2 { display: block; padding-left: 48px; }
+  .schema .arrow { color: var(--muted); }
+
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="title">Arch Install Guide</div>
+      <div class="subtitle">dracut · UKI · LUKS2 · Btrfs</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Setup</div>
+      <button class="nav-item active" onclick="goTo(0)"><span class="num">00</span> Overview &amp; Goals</button>
+      <button class="nav-item" onclick="goTo(1)"><span class="num">01</span> Live Environment</button>
+      <button class="nav-item" onclick="goTo(2)"><span class="num">02</span> Partition Disk</button>
+      <button class="nav-item" onclick="goTo(3)"><span class="num">03</span> LUKS2 Encryption</button>
+      <button class="nav-item" onclick="goTo(4)"><span class="num">04</span> Btrfs &amp; Subvolumes</button>
+      <button class="nav-item" onclick="goTo(5)"><span class="num">05</span> Mount Filesystems</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Installation</div>
+      <button class="nav-item" onclick="goTo(6)"><span class="num">06</span> pacstrap Base</button>
+      <button class="nav-item" onclick="goTo(7)"><span class="num">07</span> fstab &amp; chroot</button>
+      <button class="nav-item" onclick="goTo(8)"><span class="num">08</span> System Config</button>
+      <button class="nav-item" onclick="goTo(9)"><span class="num">09</span> dracut Setup</button>
+      <button class="nav-item" onclick="goTo(10)"><span class="num">10</span> kernel-install &amp; UKI</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Boot</div>
+      <button class="nav-item" onclick="goTo(11)"><span class="num">11</span> systemd-boot</button>
+      <button class="nav-item" onclick="goTo(12)"><span class="num">12</span> Finalise &amp; Reboot</button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Post-install</div>
+      <button class="nav-item" onclick="goTo(13)"><span class="num">13</span> Cache &amp; Mirrors</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="page-header">
+      <h1>Arch Linux: Modern Secure Boot Stack</h1>
+      <div class="tagline">dracut · kernel-install · UKI · LUKS2 · Btrfs</div>
+      <div class="tag-row">
+        <span class="tag tag-blue">UEFI only</span>
+        <span class="tag tag-green">LUKS2</span>
+        <span class="tag tag-green">Btrfs</span>
+        <span class="tag tag-warn">dracut</span>
+        <span class="tag tag-warn">UKI</span>
+        <span class="tag tag-blue">systemd-boot</span>
+      </div>
+    </div>
+
+    <!-- SECTION 0: Overview -->
+    <div class="section active" id="s0">
+      <div class="section-title">Overview &amp; Goals</div>
+      <div class="section-desc">This guide replaces the default mkinitcpio stack with dracut + kernel-install, producing Unified Kernel Images (UKI) that live on the ESP. The root filesystem is LUKS2-encrypted Btrfs with subvolumes.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">◈</div><div class="step-title">What you'll end up with</div></div>
+        <div class="step-body">
+          <div class="schema">
+<span class="disk">nvme0n1 (GPT)</span>
+<span class="indent"><span class="part">├─ nvme0n1p1</span>  <span class="fs">FAT32</span>  <span class="mount">/efi</span>  <span class="arrow">←</span> ESP (≥ 1 GiB recommended)</span>
+<span class="indent"><span class="part">└─ nvme0n1p2</span>  <span class="fs">LUKS2</span>  <span class="arrow">←</span> encrypted container</span>
+<span class="indent2"><span class="part">└─ /dev/mapper/cryptroot</span>  <span class="fs">Btrfs</span></span>
+<span class="indent2">  <span class="part">├─ @</span>          <span class="mount">/</span></span>
+<span class="indent2">  <span class="part">├─ @home</span>      <span class="mount">/home</span></span>
+<span class="indent2">  <span class="part">├─ @snapshots</span> <span class="mount">/.snapshots</span></span>
+<span class="indent2">  <span class="part">├─ @var_log</span>   <span class="mount">/var/log</span></span>
+<span class="indent2">  <span class="part">└─ @var_cache</span> <span class="mount">/var/cache/pacman/pkg</span></span>
+          </div>
+
+          <div class="callout callout-info">
+            <span class="callout-icon">ℹ</span>
+            <span><b>ESP on /efi, not /boot.</b> All UKI images are written directly to <code>/efi/EFI/Linux/</code> by kernel-install. The kernel and initramfs never live in /boot on disk.</span>
+          </div>
+
+          <div class="callout callout-warn">
+            <span class="callout-icon">⚠</span>
+            <span><b>UEFI only.</b> This setup requires a UEFI system. Legacy BIOS/MBR is not supported by this configuration.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">◈</div><div class="step-title">Key technology choices</div></div>
+        <div class="step-body">
+          <p><b style="color:#4fc3f7">dracut</b> — generates the initramfs with built-in LUKS/systemd support, and can embed cmdline + kernel into a single EFI binary (UKI). Unlike mkinitcpio, it uses a systemd-based init inside the initramfs natively.</p>
+          <p><b style="color:#4fc3f7">kernel-install</b> — a script (from systemd) that, on kernel installation, automatically calls dracut and installs the resulting UKI to the ESP. Hooks into pacman via install scripts.</p>
+          <p><b style="color:#4fc3f7">UKI (Unified Kernel Image)</b> — a single <code>.efi</code> file containing kernel + initramfs + cmdline + os-release. It can be directly booted by firmware or by systemd-boot. Enables measured boot and Secure Boot signing later.</p>
+          <p><b style="color:#4fc3f7">systemd-boot</b> — a minimal EFI boot manager. It discovers UKIs automatically in <code>/efi/EFI/Linux/</code> with no extra config files needed.</p>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" disabled>← Back</button>
+        <button class="btn btn-primary" onclick="goTo(1)">Live Environment →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 1: Live Environment -->
+    <div class="section" id="s1">
+      <div class="section-title">Live Environment</div>
+      <div class="section-desc">Boot the Arch ISO and prepare the live environment before touching the disk.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Set keyboard layout</div></div>
+        <div class="step-body">
+          <p>The Arch ISO defaults to <code>us</code>. Load the Italian layout for the live session so passwords and paths are typed correctly from the start.</p>
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">loadkeys</span> it</span>
+            </div>
+          </div>
+          <div class="callout callout-warn">
+            <span class="callout-icon">⚠</span>
+            <span>Set the layout <b>before</b> typing your LUKS passphrase during <code>cryptsetup luksFormat</code>. A passphrase typed with the wrong layout will be impossible to reproduce correctly on reboot.</span>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span><code>loadkeys</code> only sets the keymap for the current live session. The persistent setting for the installed system is done later with <code>localectl set-keymap --no-convert it</code> in the chroot (section 08). To browse available keymaps: <code>localectl list-keymaps | grep it</code>.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Verify UEFI boot mode</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">cat</span> <span class="path">/sys/firmware/efi/fw_platform_size</span></span>
+<span class="line"><span class="comment"># Must output 64 (or 32 for 32-bit UEFI)</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Connect to the internet</div></div>
+        <div class="step-body">
+          <p>Wired: usually works automatically. Wireless:</p>
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">iwctl</span></span>
+<span class="line"><span class="comment"># [iwd] device list</span></span>
+<span class="line"><span class="comment"># [iwd] station wlan0 scan</span></span>
+<span class="line"><span class="comment"># [iwd] station wlan0 get-networks</span></span>
+<span class="line"><span class="comment"># [iwd] station wlan0 connect "SSID"</span></span>
+<span class="line"><span class="comment"># [iwd] quit</span></span>
+<span class="line"></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">ping</span> <span class="flag">-c3</span> archlinux.org</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Sync clock &amp; update mirrors</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">timedatectl</span> set-ntp true</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">reflector</span> <span class="flag">--country</span> <span class="str">"Germany,France"</span> <span class="flag">--latest</span> <span class="num">10</span> <span class="flag">--sort</span> rate <span class="flag">--save</span> <span class="path">/etc/pacman.d/mirrorlist</span></span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">✦</span>
+            <span>Adjust <code>--country</code> to your nearest countries for best speeds.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(0)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(2)">Partition Disk →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Partitioning -->
+    <div class="section" id="s2">
+      <div class="section-title">Partition the Disk</div>
+      <div class="section-desc">Create two partitions: an EFI System Partition and a LUKS container. Adjust <code>/dev/nvme0n1</code> to your actual disk.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Identify your disk</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">lsblk</span> <span class="flag">-o</span> NAME,SIZE,TYPE,MODEL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Wipe &amp; create GPT table with fdisk</div></div>
+        <div class="step-body">
+          <div class="callout callout-danger">
+            <span class="callout-icon">✕</span>
+            <span><b>This destroys all data on the disk.</b> Double-check the device name before proceeding.</span>
+          </div>
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">fdisk</span> <span class="path">/dev/nvme0n1</span></span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Inside fdisk:</span></span>
+<span class="line"><span class="comment">#  g          → new GPT partition table</span></span>
+<span class="line"><span class="comment">#  n          → new partition (p1, default start, +1G) → EFI</span></span>
+<span class="line"><span class="comment">#  t → 1      → type: EFI System (1)</span></span>
+<span class="line"><span class="comment">#  n          → new partition (p2, default start, default end) → LUKS</span></span>
+<span class="line"><span class="comment">#  t → 23       → type: Linux root x86-64 (23)</span></span>
+<span class="line"><span class="comment">#  w          → write and quit</span></span>
+            </div>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">ℹ</span>
+            <span>Use at least <b>1 GiB</b> for the ESP. With UKIs, each kernel version produces its own ~60–100 MB EFI binary stored there. 512 MiB is too small if you keep multiple kernels.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Format the ESP</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">mkfs.fat</span> <span class="flag">-F32</span> <span class="flag">-n</span> EFI <span class="path">/dev/nvme0n1p1</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(3)">LUKS2 Encryption →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 3: LUKS2 -->
+    <div class="section" id="s3">
+      <div class="section-title">LUKS2 Encryption</div>
+      <div class="section-desc">Encrypt the root partition with LUKS2 using Argon2id key derivation — significantly stronger than the LUKS1 default PBKDF2.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create the LUKS2 container</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">cryptsetup</span> luksFormat \</span>
+<span class="line">    <span class="flag">--type</span> luks2 \</span>
+<span class="line">    <span class="flag">--cipher</span> aes-xts-plain64 \</span>
+<span class="line">    <span class="flag">--key-size</span> <span class="num">512</span> \</span>
+<span class="line">    <span class="flag">--hash</span> sha512 \</span>
+<span class="line">    <span class="flag">--pbkdf</span> argon2id \</span>
+<span class="line">    <span class="flag">--iter-time</span> <span class="num">3000</span> \</span>
+<span class="line">    <span class="flag">--label</span> CRYPTROOT \</span>
+<span class="line">    <span class="path">/dev/nvme0n1p2</span></span>
+            </div>
+          </div>
+          <div class="callout callout-warn">
+            <span class="callout-icon">⚠</span>
+            <span>You must type <code>YES</code> in uppercase to confirm. Choose a strong passphrase — this is your only encryption key (you can add a keyfile later with <code>cryptsetup luksAddKey</code>).</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Open the container</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">cryptsetup</span> open <span class="path">/dev/nvme0n1p2</span> cryptroot</span>
+<span class="line"><span class="comment"># → /dev/mapper/cryptroot is now available</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(4)">Btrfs &amp; Subvolumes →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 4: Btrfs -->
+    <div class="section" id="s4">
+      <div class="section-title">Btrfs &amp; Subvolumes</div>
+      <div class="section-desc">Format the LUKS container as Btrfs and create a logical subvolume layout that enables snapshotting and selective CoW control.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Create the Btrfs filesystem</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">mkfs.btrfs</span> <span class="flag">-L</span> ARCH <span class="path">/dev/mapper/cryptroot</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Mount the top-level and create subvolumes</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">mount</span> <span class="path">/dev/mapper/cryptroot</span> /mnt</span>
+<span class="line"></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">btrfs</span> subvolume create /mnt/@</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">btrfs</span> subvolume create /mnt/@home</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">btrfs</span> subvolume create /mnt/@snapshots</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">btrfs</span> subvolume create /mnt/@var_log</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">btrfs</span> subvolume create /mnt/@var_cache</span>
+<span class="line"></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">umount</span> /mnt</span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">✦</span>
+            <span><code>@var_log</code> and <code>@var_cache</code> as separate subvolumes excludes them from root snapshots, preventing large or frequently-written data from bloating snapshots.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(3)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(5)">Mount Filesystems →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 5: Mount -->
+    <div class="section" id="s5">
+      <div class="section-title">Mount Filesystems</div>
+      <div class="section-desc">Mount all subvolumes and the ESP with the correct options before running pacstrap.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Mount root and all subvolumes</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="comment"># Common btrfs options</span></span>
+<span class="line"><span class="kw">OPTS</span>=<span class="str">"noatime,compress=zstd:1,space_cache=v2"</span></span>
+<span class="line"></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">mount</span> <span class="flag">-o</span> <span class="str">${OPTS},subvol=@</span>           /dev/mapper/cryptroot /mnt</span>
+<span class="line"></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">mkdir</span> <span class="flag">-p</span> /mnt/{efi,home,.snapshots,var/log,var/cache/pacman/pkg}</span>
+<span class="line"></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">mount</span> <span class="flag">-o</span> <span class="str">${OPTS},subvol=@home</span>       /dev/mapper/cryptroot /mnt/home</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">mount</span> <span class="flag">-o</span> <span class="str">${OPTS},subvol=@snapshots</span>  /dev/mapper/cryptroot /mnt/.snapshots</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">mount</span> <span class="flag">-o</span> <span class="str">${OPTS},subvol=@var_log</span>    /dev/mapper/cryptroot /mnt/var/log</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">mount</span> <span class="flag">-o</span> <span class="str">${OPTS},subvol=@var_cache</span>  /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Mount the ESP at /efi</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">mount</span> <span class="flag">--mkdir</span> <span class="path">/dev/nvme0n1p1</span> /mnt/efi</span>
+            </div>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">ℹ</span>
+            <span>The ESP is mounted at <code>/efi</code>, <b>not</b> <code>/boot</code>. This means <code>/boot</code> lives on the encrypted Btrfs root — only the final UKI EFI binary is unencrypted on the ESP.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(4)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(6)">pacstrap Base →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 6: pacstrap -->
+    <div class="section" id="s6">
+      <div class="section-title">pacstrap Base System</div>
+      <div class="section-desc">Install the base system. Note: we do <b>not</b> install mkinitcpio. We'll install dracut instead after chrooting.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Install base packages</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">pacstrap</span> <span class="flag">-K</span> /mnt \</span>
+<span class="line">    base \</span>
+<span class="line">    linux \</span>
+<span class="line">    linux-headers \</span>
+<span class="line">    linux-firmware \</span>
+<span class="line">    btrfs-progs \</span>
+<span class="line">    cryptsetup \</span>
+<span class="line">    dracut \</span>
+<span class="line">    systemd-ukify \</span>
+<span class="line">    plymouth \</span>
+<span class="line">    efibootmgr \</span>
+<span class="line">    base-devel \</span>
+<span class="line">    vim \</span>
+<span class="line">    networkmanager \</span>
+<span class="line">    intel-ucode \</span>
+<span class="line">    amd-ucode</span>
+            </div>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">&#x2139;</span>
+            <span>Install <b>both</b> <code>intel-ucode</code> and <code>amd-ucode</code> regardless of your CPU. dracut's <code>early_microcode=yes</code> automatically selects only the correct one for the running hardware at build time, so there is no cost to having both present.</span>
+          </div>
+
+          <div class="callout callout-warn">
+            <span class="callout-icon">⚠</span>
+            <span>Do <b>not</b> install <code>mkinitcpio</code>. The <code>linux</code> package will try to run mkinitcpio hooks on install — that's fine for now; we'll replace the initramfs with dracut after configuring it in chroot. The UKI won't be built until kernel-install is properly configured.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(5)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(7)">fstab &amp; chroot →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 7: fstab + chroot -->
+    <div class="section" id="s7">
+      <div class="section-title">fstab &amp; chroot</div>
+      <div class="section-desc">Generate the filesystem table and enter the new system.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Generate fstab</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">genfstab</span> <span class="flag">-U</span> /mnt >> /mnt/etc/fstab</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">cat</span> /mnt/etc/fstab  <span class="comment"># verify it looks correct</span></span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">✦</span>
+            <span>Verify the fstab: you should see entries for <code>/</code>, <code>/home</code>, <code>/.snapshots</code>, <code>/var/log</code>, <code>/var/cache/pacman/pkg</code> (all Btrfs with subvol= options) and <code>/efi</code> (vfat). There should be <b>no</b> separate <code>/boot</code> entry.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Enter the chroot</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">arch-chroot</span> /mnt</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(6)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(8)">System Config →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 8: System Config -->
+    <div class="section" id="s8">
+      <div class="section-title">System Configuration</div>
+      <div class="section-desc">Configure locale, timezone, hostname, and user accounts inside the chroot.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Timezone &amp; locale</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">ln</span> <span class="flag">-sf</span> <span class="path">/usr/share/zoneinfo/Europe/Rome</span> /etc/localtime</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">hwclock</span> <span class="flag">--systohc</span></span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Uncomment your locale(s) in /etc/locale.gen, e.g. en_US.UTF-8</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">sed</span> <span class="flag">-i</span> <span class="str">'s/#en_US.UTF-8/en_US.UTF-8/'</span> /etc/locale.gen</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">locale-gen</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">echo</span> <span class="str">"LANG=en_US.UTF-8"</span> > /etc/locale.conf</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Console keymap (persistent)</div></div>
+        <div class="step-body">
+          <p>Use <code>localectl</code> to set the console keymap and X11 keymap independently. The <code>--no-convert</code> flag prevents localectl from auto-deriving one from the other.</p>
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="comment"># Set console (TTY) keymap — writes KEYMAP= to /etc/vconsole.conf</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">localectl</span> set-keymap <span class="flag">--no-convert</span> it</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Set X11 keymap — writes to /etc/X11/xorg.conf.d/00-keyboard.conf</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">localectl</span> set-x11-keymap <span class="flag">--no-convert</span> it</span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span>Verify with <code>localectl status</code> — you should see both <b>VC Keymap: it</b> and <b>X11 Layout: it</b>.</span>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">&#x2139;</span>
+            <span>You may also want to set a console font in <code>/etc/vconsole.conf</code> after localectl writes it. Add <code>FONT=eurlatgr</code> to cover Italian accented characters — verify it exists first with <code>ls /usr/share/kbd/consolefonts/eurlatgr*</code>. If missing, install <code>kbd</code> with <code>pacman -S kbd</code>. If <code>systemd-vconsole-setup.service</code> fails on boot, omit the <code>FONT=</code> line to narrow it down.</span>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span>dracut picks up <code>/etc/vconsole.conf</code> automatically and includes the keymap in the initramfs — the Italian layout will be active at the LUKS passphrase prompt on boot.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Hostname &amp; hosts</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">echo</span> <span class="str">"mymachine"</span> > /etc/hostname</span>
+            </div>
+          </div>
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/hosts</span></div>
+            <div class="file-content">
+<span class="fc">127.0.0.1   localhost</span>
+<span class="fc">::1         localhost</span>
+<span class="fc">127.0.1.1   mymachine.localdomain  mymachine</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Root password &amp; user</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">passwd</span></span>
+<span class="line"></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">useradd</span> <span class="flag">-mG</span> wheel,audio,video antonio</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">passwd</span> antonio</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Enable sudo for wheel group:</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">EDITOR=vim</span> visudo  <span class="comment"># uncomment: %wheel ALL=(ALL:ALL) ALL</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">5</div><div class="step-title">Get the LUKS partition UUID</div></div>
+        <div class="step-body">
+          <p>You'll need this for the kernel command line in the next steps:</p>
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">blkid</span> <span class="flag">-s</span> UUID <span class="flag">-o</span> value <span class="path">/dev/nvme0n1p2</span></span>
+<span class="line"><span class="comment"># You'll need this for /etc/kernel/cmdline in section 10</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(7)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(9)">dracut Setup →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 9: dracut -->
+    <div class="section" id="s9">
+      <div class="section-title">Configure dracut</div>
+      <div class="section-desc">When kernel-install drives the build, dracut acts as a subordinate tool — it builds the initramfs and assembles the UKI, but kernel-install controls the paths, cmdline, and EFI stub. dracut.conf only expresses <em>how</em> to build — modules, compression, microcode. The cmdline, splash, and stub are owned by ukify via <code>/etc/kernel/cmdline</code> and <code>/etc/kernel/uki.conf</code>.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Main dracut configuration</div></div>
+        <div class="step-body">
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/dracut.conf.d/10-main.conf</span></div>
+            <div class="file-content">
+<span class="fc2"># Modules: systemd init, LUKS (crypt) + systemd-cryptsetup (dracut ≥102)</span>
+<span class="fc">add_dracutmodules+=<span class="fv">" systemd crypt "</span></span>
+<span class="fc"> </span>
+<span class="fc2"># Compress the initramfs</span>
+<span class="fc">compress=<span class="fv">"zstd"</span></span>
+<span class="fc"> </span>
+<span class="fc2"># Embed CPU microcode as early CPIO (intel-ucode / amd-ucode)</span>
+<span class="fc">early_microcode=<span class="fv">"yes"</span></span>
+<span class="fc"> </span>
+            </div>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">&#x2139;</span>
+            <span>No <code>uefi=</code>, <code>uefi_stub=</code>, <code>uefi_dir=</code>, <code>kernel_cmdline=</code>, or <code>uefi_splash=</code> here. Those are now owned by ukify via <code>/etc/kernel/uki.conf</code> and <code>/etc/kernel/cmdline</code>. dracut.conf is purely about initramfs construction.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Btrfs module</div></div>
+        <div class="step-body">
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/dracut.conf.d/20-btrfs.conf</span></div>
+            <div class="file-content">
+<span class="fc">add_dracutmodules+=<span class="fv">" btrfs "</span></span>
+<span class="fc">filesystems+=<span class="fv">" btrfs "</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Host-only mode</div></div>
+        <div class="step-body">
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/dracut.conf.d/30-host.conf</span></div>
+            <div class="file-content">
+<span class="fc2"># Only include modules needed for this hardware — smaller, faster UKI</span>
+<span class="fc">hostonly=<span class="fv">"yes"</span></span>
+<span class="fc">hostonly_cmdline=<span class="fv">"no"</span></span>
+
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span><code>hostonly=yes</code> produces a lean UKI by only including what your current hardware needs. The resulting image won&#x27;t boot on a different machine without rebuilding — that&#x27;s fine for a personal install.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Mask dracut&#x27;s own pacman hooks</div></div>
+        <div class="step-body">
+          <p>dracut ships two pacman hooks that call dracut directly on kernel install/remove, bypassing kernel-install entirely. Mask them with null symlinks so they fire but do nothing:</p>
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">ln</span> <span class="flag">-s</span> /dev/null <span class="path">/etc/pacman.d/hooks/90-dracut-install.hook</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">ln</span> <span class="flag">-s</span> /dev/null <span class="path">/etc/pacman.d/hooks/60-dracut-remove.hook</span></span>
+            </div>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">&#x2139;</span>
+            <span>A symlink to <code>/dev/null</code> at the same path as a system hook is the standard pacman way to mask it. Pacman finds the local hook first and treats it as empty, so the system-provided one in <code>/usr/share/libalpm/hooks/</code> is never executed.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(8)">&#x2190; Back</button>
+        <button class="btn btn-primary" onclick="goTo(10)">kernel-install &amp; UKI &#x2192;</button>
+      </div>
+    </div>
+
+    <!-- SECTION 10: kernel-install -->
+    <div class="section" id="s10">
+      <div class="section-title">kernel-install &amp; UKI Generation</div>
+      <div class="section-desc">kernel-install orchestrates the whole build: it reads config, invokes dracut via the <code>50-dracut.install</code> plugin, passes the EFI stub, cmdline, and output path, then copies the resulting UKI to the ESP.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Configure kernel-install</div></div>
+        <div class="step-body">
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/kernel/install.conf</span></div>
+            <div class="file-content">
+<span class="fc">layout=<span class="fv">uki</span></span>
+            </div>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">&#x2139;</span>
+            <span><code>layout=uki</code> is the only key needed here. kernel-install will use ukify (via <code>systemd-ukify</code>) to assemble the final UKI, with dracut generating the initramfs as part of that process.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Kernel command line</div></div>
+        <div class="step-body">
+          <p>kernel-install reads the cmdline from <code>/etc/kernel/cmdline</code> and passes it to ukify, which embeds it into the UKI.</p>
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/kernel/cmdline</span></div>
+            <div class="file-content">
+<span class="fc">rd.luks.uuid=<span class="fv">&lt;YOUR-LUKS-UUID&gt;</span> rd.luks.name=<span class="fv">&lt;YOUR-LUKS-UUID&gt;</span>=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ splash quiet rw</span>
+            </div>
+          </div>
+          <div class="callout callout-warn">
+            <span class="callout-icon">&#x26A0;</span>
+            <span>Replace both instances of <code>&lt;YOUR-LUKS-UUID&gt;</code> with the UUID from <code>blkid -s UUID -o value /dev/nvme0n1p2</code>. Single line, no trailing newline.</span>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">&#x2139;</span>
+            <span>If this file does not exist, kernel-install falls back to <code>/proc/cmdline</code> — the live ISO&#x27;s parameters in a chroot. Always create it explicitly.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">UKI configuration — splash &amp; EFI stub</div></div>
+        <div class="step-body">
+          <p>ukify reads <code>/etc/kernel/uki.conf</code> for UKI-specific settings like the splash screen and EFI stub path. These are no longer set in dracut.conf.</p>
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/kernel/uki.conf</span></div>
+            <div class="file-content">
+<span class="fc">[UKI]</span>
+<span class="fc">Splash=<span class="fv">/usr/share/systemd/bootctl/splash-arch.bmp</span></span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span>The splash image is displayed by the firmware as soon as the UKI is executed, before the kernel starts. The BMP ships with the <code>systemd</code> package — no extra install needed.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Create the kernel-install pacman hooks</div></div>
+        <div class="step-body">
+          <p>See section 09 step 4 for masking dracut&#x27;s hooks. Now create the hooks that trigger kernel-install instead.</p>
+          <p>Helper script called by both hooks:</p>
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/usr/local/bin/kernel-install-hook</span></div>
+            <div class="file-content">
+<span class="fc2">#!/usr/bin/env bash</span>
+<span class="fc">set -euo pipefail</span>
+<span class="fc">shopt -s inherit_errexit nullglob</span>
+<span class="fc"> </span>
+<span class="fc">cd /</span>
+<span class="fc">all_kernels=0</span>
+<span class="fc">declare -A versions</span>
+<span class="fc"> </span>
+<span class="fc">add_file() {</span>
+<span class="fc">    local kver="$1"</span>
+<span class="fc">    kver="${kver##usr/lib/modules/}"</span>
+<span class="fc">    kver="${kver%%/*}"</span>
+<span class="fc">    versions["$kver"]=""</span>
+<span class="fc">}</span>
+<span class="fc"> </span>
+<span class="fc2"># Read matched paths from stdin (provided by NeedsTargets)</span>
+<span class="fc">while read -r path; do</span>
+<span class="fc">    case "$path" in</span>
+<span class="fc">    usr/lib/modules/*/vmlinuz | usr/lib/modules/*/extramodules/*)</span>
+<span class="fc">        add_file "$path" ;;</span>
+<span class="fc">    *)</span>
+<span class="fc2">        # Non-kernel trigger (dracut, firmware, ucode...)</span>
+<span class="fc">        all_kernels=1 ;;</span>
+<span class="fc">    esac</span>
+<span class="fc">done</span>
+<span class="fc"> </span>
+<span class="fc2"># If triggered by a non-kernel path, rebuild for all installed kernels</span>
+<span class="fc">if (( all_kernels )); then</span>
+<span class="fc">    for file in usr/lib/modules/*/vmlinuz; do</span>
+<span class="fc">        pacman -Qqo "$file" &gt;/dev/null 2&gt;&amp;1 &amp;&amp; add_file "$file"</span>
+<span class="fc">    done</span>
+<span class="fc">fi</span>
+<span class="fc"> </span>
+<span class="fc">for kver in "${!versions[@]}"; do</span>
+<span class="fc">    kimage="/usr/lib/modules/$kver/vmlinuz"</span>
+<span class="fc">    kernel-install "$@" "$kver" "$kimage" || true</span>
+<span class="fc">done</span>
+            </div>
+          </div>
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">chmod</span> 755 <span class="path">/usr/local/bin/kernel-install-hook</span></span>
+            </div>
+          </div>
+          <p>The add hook:</p>
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/pacman.d/hooks/90-kernel-install-add.hook</span></div>
+            <div class="file-content">
+<span class="fc">[Trigger]</span>
+<span class="fc">Type = <span class="fv">Path</span></span>
+<span class="fc">Operation = <span class="fv">Install</span></span>
+<span class="fc">Operation = <span class="fv">Upgrade</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/modules/*/vmlinuz</span></span>
+<span class="fc"> </span>
+<span class="fc">[Trigger]</span>
+<span class="fc">Type = <span class="fv">Path</span></span>
+<span class="fc">Operation = <span class="fv">Install</span></span>
+<span class="fc">Operation = <span class="fv">Upgrade</span></span>
+<span class="fc">Operation = <span class="fv">Remove</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/firmware/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/modules/*/extramodules/*</span></span>
+<span class="fc">Target = <span class="fv">usr/src/*/dkms.conf</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/dracut/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/dracut/*/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/dracut/*/*/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/kernel/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/kernel/*/*</span></span>
+<span class="fc">Target = <span class="fv">boot/*-ucode.img</span></span>
+<span class="fc"> </span>
+<span class="fc">[Action]</span>
+<span class="fc">Description = <span class="fv">Installing kernel and initrd using kernel-install...</span></span>
+<span class="fc">When = <span class="fv">PostTransaction</span></span>
+<span class="fc">Exec = <span class="fv">/usr/local/bin/kernel-install-hook add</span></span>
+<span class="fc">NeedsTargets</span>
+            </div>
+          </div>
+          <p>The remove hook:</p>
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/pacman.d/hooks/40-kernel-install-remove.hook</span></div>
+            <div class="file-content">
+<span class="fc">[Trigger]</span>
+<span class="fc">Type = <span class="fv">Path</span></span>
+<span class="fc">Operation = <span class="fv">Upgrade</span></span>
+<span class="fc">Operation = <span class="fv">Remove</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/modules/*/vmlinuz</span></span>
+<span class="fc"> </span>
+<span class="fc">[Trigger]</span>
+<span class="fc">Type = <span class="fv">Path</span></span>
+<span class="fc">Operation = <span class="fv">Install</span></span>
+<span class="fc">Operation = <span class="fv">Upgrade</span></span>
+<span class="fc">Operation = <span class="fv">Remove</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/firmware/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/modules/*/extramodules/*</span></span>
+<span class="fc">Target = <span class="fv">usr/src/*/dkms.conf</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/dracut/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/dracut/*/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/dracut/*/*/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/kernel/*</span></span>
+<span class="fc">Target = <span class="fv">usr/lib/kernel/*/*</span></span>
+<span class="fc">Target = <span class="fv">boot/*-ucode.img</span></span>
+<span class="fc"> </span>
+<span class="fc">[Action]</span>
+<span class="fc">Description = <span class="fv">Removing kernel and initrd using kernel-install...</span></span>
+<span class="fc">When = <span class="fv">PostTransaction</span></span>
+<span class="fc">Exec = <span class="fv">/usr/local/bin/kernel-install-hook remove</span></span>
+<span class="fc">NeedsTargets</span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span>The second <code>[Trigger]</code> block fires when dracut itself updates, or when firmware/ucode/DKMS modules change — not just when the kernel vmlinuz changes. The script&#x27;s <code>all_kernels</code> flag handles these cases by rebuilding UKIs for every currently installed kernel.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">Build the UKI now</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="comment"># Get the installed kernel version</span></span>
+<span class="line"><span class="kw">KVER</span>=$(<span class="cmd">ls</span> /usr/lib/modules)</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">echo</span> $KVER  <span class="comment"># e.g. 6.x.y-arch1-1</span></span>
+<span class="line"></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">kernel-install</span> <span class="flag">-v</span> add <span class="str">${KVER}</span> <span class="path">/usr/lib/modules/${KVER}/vmlinuz</span></span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Verify the UKI was created on the ESP</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">find</span> /efi <span class="flag">-name</span> <span class="str">"*.efi"</span></span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span>The <code>-v</code> flag shows the full plugin execution log — useful for verifying that <code>50-dracut.install</code> is called with <code>--uefi</code> (not <code>--no-uefi</code>) and that <code>90-uki-copy.install</code> succeeds.</span>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span>Verify the cmdline was embedded: <code>objdump -j .cmdline -s $(find /efi -name "*.efi")</code></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(9)">&#x2190; Back</button>
+        <button class="btn btn-primary" onclick="goTo(11)">systemd-boot &#x2192;</button>
+      </div>
+    </div>
+
+    <!-- SECTION 11: systemd-boot -->
+    <div class="section" id="s11">
+      <div class="section-title">Install systemd-boot</div>
+      <div class="section-desc">systemd-boot is a minimal EFI boot manager that auto-discovers UKIs from <code>/efi/EFI/Linux/</code> — minimal configuration needed.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Install bootloader to ESP</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">bootctl</span> <span class="flag">--esp-path=/efi</span> install</span>
+            </div>
+          </div>
+          <p>This installs systemd-boot to <code>/efi/EFI/systemd/</code> and creates an NVRAM boot entry.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Loader configuration (optional but recommended)</div></div>
+        <div class="step-body">
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/efi/loader/loader.conf</span></div>
+            <div class="file-content">
+<span class="fc">default  @saved</span>
+<span class="fc">timeout  3</span>
+<span class="fc">console-mode  auto</span>
+<span class="fc">editor   no</span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">✦</span>
+            <span><code>editor no</code> prevents anyone from modifying the kernel cmdline at boot — since it's baked into the UKI anyway, this is purely defensive. <code>@saved</code> boots the last manually selected entry.</span>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">ℹ</span>
+            <span>You do <b>not</b> need to create any <code>/efi/loader/entries/*.conf</code> files. systemd-boot automatically discovers UKIs placed in <code>/efi/EFI/Linux/</code> thanks to the <code>Type#2</code> boot entry discovery spec.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Enable automatic bootloader updates</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">systemctl</span> enable systemd-boot-update.service</span>
+            </div>
+          </div>
+          <p>This service updates the bootloader binaries on the ESP whenever systemd-boot itself is updated via pacman.</p>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(10)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(12)">Finalise &amp; Reboot →</button>
+      </div>
+    </div>
+
+    <!-- SECTION 12: Finalise -->
+    <div class="section" id="s12">
+      <div class="section-title">Finalise &amp; Reboot</div>
+      <div class="section-desc">Last checks before leaving the chroot and rebooting into your new system.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Enable essential services</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">systemctl</span> enable NetworkManager</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">systemctl</span> enable systemd-resolved</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">Final verification checklist</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">chroot shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="comment"># 1. UKI exists on ESP</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">ls</span> /efi/EFI/Linux/</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># 2. systemd-boot is installed</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">bootctl</span> status</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># 3. fstab looks correct</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">cat</span> /etc/fstab</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># 4. LUKS UUID in /etc/kernel/cmdline matches blkid</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">cat</span> <span class="path">/etc/kernel/cmdline</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">blkid</span> <span class="flag">-s</span> UUID <span class="flag">-o</span> value /dev/nvme0n1p2</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">Exit, unmount, reboot</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt"># </span><span class="cmd">exit</span>   <span class="comment"># leave chroot</span></span>
+<span class="line"><span class="prompt"># </span><span class="cmd">umount</span> <span class="flag">-R</span> /mnt</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">cryptsetup</span> close cryptroot</span>
+<span class="line"><span class="prompt"># </span><span class="cmd">reboot</span></span>
+            </div>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">✦</span>
+            <span>On first boot you'll be prompted for your LUKS passphrase by the systemd cryptsetup agent inside the initramfs. After unlocking, the Btrfs root mounts automatically and the system boots.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">◈</div><div class="step-title">Further recommendations</div></div>
+        <div class="step-body">
+          <p><b style="color:#4fc3f7">Snapper</b> — install <code>snapper</code> and configure it for the <code>@</code> and <code>@home</code> subvolumes for automatic Btrfs snapshots.</p>
+          <p><b style="color:#4fc3f7">TPM2 unlock</b> — enroll your LUKS key into the TPM2 chip with <code>systemd-cryptenroll --tpm2-device=auto /dev/nvme0n1p2</code> so you don't need to type the passphrase on trusted boots.</p>
+          <p><b style="color:#4fc3f7">Secure Boot</b> — use <code>sbctl</code> to create your own Secure Boot keys and sign the UKI. dracut's UKI format is designed exactly for this workflow.</p>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(11)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(13)">Package Cache &amp; Mirrors &rarr;</button>
+      </div>
+    </div>
+
+    <!-- SECTION 13: paccache + reflector -->
+    <div class="section" id="s13">
+      <div class="section-title">Package Cache &amp; Mirror Management</div>
+      <div class="section-desc">Keep the package cache lean with <code>paccache</code> and the mirror list fast with <code>reflector</code>. Both integrate with systemd timers for zero-maintenance operation.</div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">1</div><div class="step-title">Install pacman-contrib &amp; reflector</div></div>
+        <div class="step-body">
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt">$ </span><span class="cmd">sudo</span> pacman <span class="flag">-S</span> pacman-contrib reflector</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">2</div><div class="step-title">paccache — automatic cache cleanup</div></div>
+        <div class="step-body">
+          <p><code>paccache</code> removes old cached package versions, keeping the last N for potential rollback. The included systemd timer runs it weekly.</p>
+          <div class="code-block">
+            <div class="code-label">shell — enable weekly timer <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt">$ </span><span class="cmd">sudo</span> systemctl enable <span class="flag">--now</span> paccache.timer</span>
+            </div>
+          </div>
+          <div class="callout callout-info">
+            <span class="callout-icon">&#x2139;</span>
+            <span>By default <code>paccache -r</code> keeps the <b>3 most recent versions</b> of each package. This is intentional — those cached versions are what makes downgrade-based rollbacks possible. Aggressive cleanup breaks that.</span>
+          </div>
+          <div class="callout callout-tip">
+            <span class="callout-icon">&#x2736;</span>
+            <span>To keep fewer versions (e.g. 2), override the service with a drop-in: <code>sudo systemctl edit paccache.service</code> and set <code>ExecStart=/usr/bin/paccache -rk2</code>.</span>
+          </div>
+          <p>Useful manual invocations:</p>
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="comment"># Dry-run: see what would be removed</span></span>
+<span class="line"><span class="prompt">$ </span><span class="cmd">paccache</span> <span class="flag">-d</span></span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Remove old versions (keep 3)</span></span>
+<span class="line"><span class="prompt">$ </span><span class="cmd">sudo</span> paccache <span class="flag">-r</span></span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Remove ALL cached versions of uninstalled packages</span></span>
+<span class="line"><span class="prompt">$ </span><span class="cmd">sudo</span> paccache <span class="flag">-ruk0</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">3</div><div class="step-title">reflector — automatic mirror ranking</div></div>
+        <div class="step-body">
+          <p><code>reflector</code> fetches the Arch mirror list, filters by country/protocol/age, sorts by speed, and writes the result to <code>/etc/pacman.d/mirrorlist</code>. Configure it once in its config file:</p>
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/xdg/reflector/reflector.conf</span></div>
+            <div class="file-content">
+<span class="fc2"># Save to the standard mirrorlist path</span>
+<span class="fc">--save /etc/pacman.d/mirrorlist</span>
+<span class="fc2"> </span>
+<span class="fc2"># HTTPS only</span>
+<span class="fc">--protocol https</span>
+<span class="fc2"> </span>
+<span class="fc2"># Italian mirrors first, fallback to nearby countries</span>
+<span class="fc">--country Italy,Germany,France,Switzerland</span>
+<span class="fc2"> </span>
+<span class="fc2"># Only mirrors synced in the last 12 hours</span>
+<span class="fc">--age 12</span>
+<span class="fc2"> </span>
+<span class="fc2"># Rank by download speed, keep 10 fastest from top 20</span>
+<span class="fc">--sort rate</span>
+<span class="fc">--latest 20</span>
+<span class="fc">--number 10</span>
+<span class="fc">--connection-timeout 5</span>
+            </div>
+          </div>
+          <div class="code-block">
+            <div class="code-label">shell — enable weekly timer <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt">$ </span><span class="cmd">sudo</span> systemctl enable <span class="flag">--now</span> reflector.timer</span>
+            </div>
+          </div>
+          <div class="callout callout-warn">
+            <span class="callout-icon">&#x26A0;</span>
+            <span>reflector <b>overwrites</b> <code>/etc/pacman.d/mirrorlist</code> on every run. Hand-edits to that file will be lost. The config above is the canonical place for your preferences.</span>
+          </div>
+          <p>Run on demand:</p>
+          <div class="code-block">
+            <div class="code-label">shell <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt">$ </span><span class="cmd">sudo</span> systemctl start reflector.service</span>
+<span class="line"><span class="prompt">$ </span><span class="cmd">journalctl</span> <span class="flag">-fu</span> reflector.service</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header"><div class="step-num">4</div><div class="step-title">pacman hook — refresh mirrors when pacman-mirrorlist updates</div></div>
+        <div class="step-body">
+          <p>The <code>pacman-mirrorlist</code> package occasionally ships a new default mirrorlist that overwrites yours. This hook re-runs reflector after any such upgrade:</p>
+          <div class="code-block">
+            <div class="code-label">shell — create hooks dir <button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+            <div class="code-content">
+<span class="line"><span class="prompt">$ </span><span class="cmd">sudo</span> mkdir <span class="flag">-p</span> <span class="path">/etc/pacman.d/hooks</span></span>
+            </div>
+          </div>
+          <div class="file-block">
+            <div class="file-header"><span class="file-dot"></span><span class="file-name">/etc/pacman.d/hooks/mirrorlist.hook</span></div>
+            <div class="file-content">
+<span class="fc">[Trigger]</span>
+<span class="fc">Operation = <span class="fv">Upgrade</span></span>
+<span class="fc">Type = <span class="fv">Package</span></span>
+<span class="fc">Target = <span class="fv">pacman-mirrorlist</span></span>
+
+<span class="fc">[Action]</span>
+<span class="fc">Description = <span class="fv">Updating mirrorlist with reflector...</span></span>
+<span class="fc">When = <span class="fv">PostTransaction</span></span>
+<span class="fc">Depends = <span class="fv">reflector</span></span>
+<span class="fc">Exec = <span class="fv">/usr/bin/reflector --config /etc/xdg/reflector/reflector.conf</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-ghost" onclick="goTo(12)">&#x2190; Back</button>
+        <button class="btn btn-primary" disabled>Done &#x2713;</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const TOTAL = 14;
+  let current = 0;
+
+  function goTo(n) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('s' + n).classList.add('active');
+    document.querySelectorAll('.nav-item')[n].classList.add('active');
+    current = n;
+    document.getElementById('progress').style.width = ((n / (TOTAL - 1)) * 100) + '%';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function copyCode(btn) {
+    const block = btn.closest('.code-block').querySelector('.code-content');
+    const lines = Array.from(block.querySelectorAll('.line'))
+      .map(l => {
+        // Remove prompt spans from copied text
+        const prompt = l.querySelector('.prompt');
+        if (prompt) prompt.remove();
+        const text = l.textContent;
+        if (prompt) l.prepend(prompt);
+        return text;
+      })
+      .join('\n')
+      .trim();
+
+    navigator.clipboard.writeText(lines).then(() => {
+      btn.textContent = 'copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'copy';
+        btn.classList.remove('copied');
+      }, 1500);
+    });
+  }
+
+  // Init progress
+  document.getElementById('progress').style.width = '0%';
+</script>
+</body>
+</html>

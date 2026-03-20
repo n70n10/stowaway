@@ -2,22 +2,19 @@
 
 # KDE plasma
 pacman -Sgq plasma | grep -vE 'discover|sddm-kcm' | sudo pacman -S --needed -
+sudo pacman -S --needed ark firefox kate konsole
 sudo systemctl enable plasmalogin.service
 
-if [[$1 = *"eos"]]; then
-    sudo pacman -S --needed sudo pacman -S --needed 
-fi
-
 # kitty & co
-sudo pacman -S --needed kitty micro starship zsh fzf zoxide stow
+#sudo pacman -S --needed kitty micro starship zsh fzf zoxide stow
 
 # a bit of fresh air
-sudo pacman -S --needed eza bat ripgrep fd duf dust btop tldr
-tldr --update
+#sudo pacman -S --needed eza bat ripgrep fd duf dust btop tldr
+#tldr --update
 
 # my favourite fonts
-sudo pacman -S --needed ttc-iosevka-aile ttc-iosevka-ss12
+#sudo pacman -S --needed ttc-iosevka-aile ttc-iosevka-ss12
 
 # stowaway!
-rm -rf ~/.config/micro
-stow kitty micro starship zsh
+#rm -rf ~/.config/micro
+#stow kitty micro starship zsh
